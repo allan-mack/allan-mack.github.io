@@ -1,0 +1,130 @@
+body {
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+nav {
+
+    background-color: #004E71;
+    align-items: center;
+}
+
+section {
+    display: flex;
+    width: 100%;
+}
+
+table {
+    border: black solid 3px;
+}
+
+th {
+    text-align: center;
+    border: black solid 3px;
+}
+
+tr {
+    border: black solid 3px;
+    width: fit-content;
+    text-align: center;
+}
+
+section>img {
+    display: flex;
+    position: relative;
+}
+
+section>aside {
+    display: flex;
+}
+
+.column {
+    padding: 0 4px;
+    border: black solid 3px;
+}
+
+.con_foot_container {
+    display: flex;
+    flex-direction: row;
+}
+
+.container {
+    float: left;
+}
+
+.flex1 {
+    display: flex;
+    width: 50%;
+}
+
+.flex2 {
+    display: flex;
+    width: 50%;
+    height: 100px;
+    align-items: center;
+}
+
+.form_container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+}
+
+.head1 {
+    background-color: #004E71;
+    width: 100%;
+}
+
+.header_container {
+    background-color: #004E71;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+
+}
+
+.nav-item:hover {
+    background-color: #f0bf00;
+}
+
+.row {
+    display: flex;
+    flex-direction: row;
+    padding: 0 1px;
+}
+
+.section-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+#background_image {
+    background: url("https://www.myflorida.com/img/SoF-seal.png") no-repeat center 2rem;
+    background-color: #004E71;
+    width: auto;
+}
+
+#card {
+    display: grid;
+    align-items: center;
+    width: auto;
+    margin: 10px;
+}
+
+#st_aug {
+    width: 100%;
+    display: flex;
+}
+
+#button_position {
+    position: absolute;
+    left: 750px;
+    bottom: 20px;
+}
