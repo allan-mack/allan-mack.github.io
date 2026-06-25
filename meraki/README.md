@@ -42,14 +42,22 @@ how the Insights engine reasons about good *and* bad conditions.
 
 ## Connect to a real organization (Live mode)
 
-1. In the Meraki dashboard, create a **read-only API key**
-   (*My profile → API access*).
+1. In the Meraki dashboard, create a **dedicated read-only organization
+   administrator**, then generate an API key while signed in as that admin
+   (*My profile → API access*). A Meraki API key inherits the **full
+   permissions of the admin who created it** — there is no inherently
+   "read-only" key — so generating it under a read-only admin is what makes it
+   safe to use here. Rotate the key periodically and revoke it if it leaks.
 2. Open MerakiScope → expand **Connect to your real Meraki organization**.
 3. Paste your API key, set a **CORS proxy URL** (see below), click
    **Connect & list organizations**, pick your org, and **Load**.
 
-Your API key lives only in the browser tab for the session. It is never stored;
-only your non-secret base/proxy URLs are remembered for convenience.
+Your API key lives only in the browser tab for the session — it is never
+written to disk, and **Disconnect** wipes it from memory and the form. Only the
+non-secret base/proxy URLs are remembered for convenience. Note that the key
+**is** transmitted to the proxy URL you configure on every request, so point
+that field only at a relay you operate and trust (and always over HTTPS — the
+app refuses non-HTTPS base/proxy URLs).
 
 ### Why a CORS proxy is required in a browser
 
@@ -61,14 +69,28 @@ header.
 
 Minimal **Cloudflare Worker** example:
 
+Minimal **Cloudflare Worker** example. It is locked down two ways: it only
+forwards to `api.meraki.com`, and it only answers your app's origin (so it is
+not an open relay that anyone who learns the URL can abuse):
+
 ```js
+const ALLOWED_ORIGIN = 'https://allan-mack.github.io'; // your app's origin
+
 export default {
   async fetch(request) {
+    const origin = request.headers.get('Origin') || '';
+    if (origin && origin !== ALLOWED_ORIGIN) {
+      return new Response('forbidden', { status: 403 });
+    }
+    // CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
     const target = new URL(request.url).searchParams.get('url');
     if (!target || !target.startsWith('https://api.meraki.com/')) {
       return new Response('blocked', { status: 400 });
     }
-    const r = await fetch(target, {
+    const upstream = await fetch(target, {
       method: request.method,
       headers: {
         Authorization: request.headers.get('Authorization'),
@@ -76,20 +98,31 @@ export default {
         'Content-Type': 'application/json',
       },
     });
-    const res = new Response(r.body, r);
-    res.headers.set('Access-Control-Allow-Origin', '*');
-    res.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    const res = new Response(upstream.body, upstream);
+    for (const [k, v] of Object.entries(corsHeaders(origin))) res.headers.set(k, v);
     return res;
   },
 };
+
+function corsHeaders(origin) {
+  return {
+    'Access-Control-Allow-Origin': origin || ALLOWED_ORIGIN,
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 ```
 
 Deploy it, then paste its URL (e.g. `https://meraki-proxy.you.workers.dev/?url=`)
 into the **CORS proxy URL** field. The app appends `url=<encoded endpoint>`
 automatically.
 
-> For production use, lock the proxy down to your own origin and consider
-> keeping the API key server-side rather than passing it through the browser.
+> **The strongest option** is to not pass the key through the browser at all:
+> store it as a Worker/server secret and have the relay attach the
+> `Authorization` header itself, so the key never leaves your infrastructure.
+> The browser then sends no credential. Use this if you can; the example above
+> is the minimum for the browser-enters-the-key model.
 
 ## Plans & subscription model
 
@@ -176,3 +209,35 @@ live org.
 - Demo mode makes **no** network requests.
 - Live mode talks only to your configured proxy → Meraki. No analytics, no
   third-party calls, no telemetry.
+
+## Security
+
+How MerakiScope protects the app and your data:
+
+- **Credential handling.** The API key is held only in memory for the session,
+  never written to `localStorage` or disk, and is wiped from memory and the
+  form on **Disconnect**. Only non-secret base/proxy URLs are remembered.
+- **HTTPS enforced.** The app rejects any base or proxy URL that isn't
+  `https://`, so the key can't be sent in cleartext.
+- **Least privilege.** Use a dedicated **read-only** Meraki admin to mint the
+  key, and rotate it. See *Live mode* above.
+- **Output encoding.** All data rendered from the API or from devices on the
+  network (client names, SSIDs, hostnames — any of which an end user could set
+  to a malicious string) is HTML-escaped before display, preventing stored XSS.
+- **Content-Security-Policy.** A strict CSP (`script-src 'self'`, no inline
+  script, `object-src 'none'`, `frame-ancestors 'none'`, etc.) is set via meta
+  tag as defense-in-depth. For full effect (and clickjacking protection via
+  response headers) host behind something that can set HTTP headers; GitHub
+  Pages cannot.
+- **No third-party runtime code.** The app loads only its own scripts — no CDN,
+  no trackers — minimizing supply-chain risk. The generated report opens in an
+  isolated tab (`noopener`, Blob URL) that cannot read back into the app.
+- **Service worker** never caches API responses or anything carrying the key
+  (requests to `api.meraki.com` and proxied `url=` requests are excluded).
+
+### Not a security boundary
+
+Subscription tiers (`js/plans.js`) are enforced **client-side only** and are
+trivially editable by the user — fine for the current static demo, but if real
+billing or paid data tiers are added, entitlements **must** be enforced
+server-side. Treat `plans.js` as UI presentation, not access control.

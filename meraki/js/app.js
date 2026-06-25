@@ -109,10 +109,21 @@
     };
   }
 
+  // Your API key is sent on every request to baseUrl/proxyUrl, so both must be
+  // HTTPS — otherwise the key could travel in cleartext. Reject anything else.
+  function validateCfg(cfg) {
+    const httpsOk = (u) => { try { return new URL(u).protocol === 'https:'; } catch (e) { return false; } };
+    if (cfg.baseUrl && !httpsOk(cfg.baseUrl)) return 'The API base URL must start with https:// (your key is sent there).';
+    if (cfg.proxyUrl && !httpsOk(cfg.proxyUrl)) return 'The CORS proxy URL must start with https:// (your key is sent there).';
+    return null;
+  }
+
   async function fetchOrgs() {
     showConnectError('');
     const cfg = readCfg();
     if (!cfg.apiKey) { showConnectError('Enter your Meraki API key first.'); return; }
+    const bad = validateCfg(cfg);
+    if (bad) { showConnectError(bad); return; }
     setBusy(true);
     try {
       const orgs = await MTK.api.listOrganizations(cfg);
@@ -132,6 +143,8 @@
     const cfg = MTK._cfg || readCfg();
     const orgId = el('org-select').value;
     if (!orgId) { showConnectError('Pick an organization.'); return; }
+    const bad = validateCfg(cfg);
+    if (bad) { showConnectError(bad); return; }
     setBusy(true, 'Pulling data from Meraki…');
     try {
       const data = await MTK.api.load(cfg, orgId);
@@ -158,6 +171,15 @@
 
   function disconnect() {
     MTK.state.data = null;
+    // Wipe the credential and any cached connection from memory and the DOM.
+    MTK._cfg = null;
+    const keyEl = el('api-key');
+    if (keyEl) keyEl.value = '';
+    const sel = el('org-select');
+    if (sel) sel.innerHTML = '';
+    el('org-picker').classList.add('hidden');
+    el('load-live').classList.add('hidden');
+    showConnectError('');
     el('app-shell').classList.add('hidden');
     el('connect-screen').classList.remove('hidden');
     location.hash = '';

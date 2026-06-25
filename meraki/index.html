@@ -3,6 +3,8 @@
 
 <head>
   <meta charset="UTF-8" />
+  <!-- frame-ancestors / X-Frame-Options must be set as HTTP headers (GitHub Pages can't); enforce at a header-capable host for clickjacking protection. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1f33" />
   <meta name="description" content="MerakiScope — an all-in-one troubleshooting companion for Cisco Meraki organizations, built for technology managers." />
@@ -36,27 +38,34 @@
         <details class="live-details">
           <summary>Connect to your real Meraki organization</summary>
           <p class="muted small">
-            Create a read-only API key in the Meraki dashboard
-            (<em>My profile → API access</em>). Your key stays in this browser and is never stored or sent anywhere except to Meraki.
+            A Meraki API key carries the <strong>full permissions of the admin who created it</strong> — there is no
+            "read-only key" by itself. Create a dedicated <strong>read-only organization administrator</strong>, then generate
+            the key under that account (<em>My profile → API access</em>) so a leak can't be used to change your network.
+            Rotate the key periodically.
+          </p>
+          <p class="muted small">
+            Your key is held only in this browser tab for this session — it is never saved to disk. It <em>is</em> sent on every
+            request to the proxy URL you configure below, so only point that field at a relay you operate and trust.
           </p>
 
           <label>Meraki API key
-            <input id="api-key" type="password" autocomplete="off" placeholder="Paste your API key" />
+            <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your API key" />
           </label>
 
           <div class="row-2">
-            <label>API base URL <span class="muted small">(optional)</span>
-              <input id="base-url" type="text" placeholder="https://api.meraki.com/api/v1" />
+            <label>API base URL <span class="muted small">(optional, https only)</span>
+              <input id="base-url" type="url" inputmode="url" placeholder="https://api.meraki.com/api/v1" />
             </label>
-            <label>CORS proxy URL <span class="muted small">(required in a browser)</span>
-              <input id="proxy-url" type="text" placeholder="https://your-proxy.example/?url=" />
+            <label>CORS proxy URL <span class="muted small">(https, required in a browser)</span>
+              <input id="proxy-url" type="url" inputmode="url" placeholder="https://your-proxy.example/?url=" />
             </label>
           </div>
 
           <div class="callout">
             <strong>Why a proxy?</strong> Web browsers block direct calls to the Meraki API for security (CORS). Run a tiny relay
             (e.g. a Cloudflare Worker) that forwards requests to <code>api.meraki.com</code> and adds the
-            <code>Access-Control-Allow-Origin</code> header, then paste its URL above. The README in this folder has a copy-paste example.
+            <code>Access-Control-Allow-Origin</code> header, then paste its URL above. Lock the relay to your own origin and only
+            an <code>api.meraki.com</code> destination. The README has a copy-paste example.
           </div>
 
           <button id="fetch-orgs" class="btn">Connect &amp; list organizations</button>

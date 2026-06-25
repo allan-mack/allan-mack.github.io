@@ -1,7 +1,7 @@
 /* MerakiScope service worker — offline shell caching for installability.
  * Caches the app shell so the tool opens instantly and works offline in Demo
  * mode. Live API calls always go to the network (never cached). */
-const CACHE = 'merakiscope-v2';
+const CACHE = 'merakiscope-v3';
 const SHELL = [
   './',
   './index.html',
