@@ -5,7 +5,7 @@
   'use strict';
 
   const MTK = global.MTK = global.MTK || {};
-  MTK.VERSION = 'v1.1';
+  MTK.VERSION = 'v1.2';
   MTK.state = {
     route: 'overview',
     data: null,
@@ -13,7 +13,17 @@
     insightFilter: 'all',
     clientSort: 'usage',
     clientQuery: '',
+    mode: 'guided',      // 'guided' (non-technical) | 'expert' (technical)
+    thresholds: {},      // user overrides for the insights engine
   };
+
+  // Restore audience mode + custom thresholds (set fully in init()).
+  try {
+    const m = localStorage.getItem('mtk_mode');
+    if (m === 'expert' || m === 'guided') MTK.state.mode = m;
+    const th = JSON.parse(localStorage.getItem('mtk_thresholds') || '{}');
+    if (th && typeof th === 'object') MTK.state.thresholds = th;
+  } catch (e) {}
 
   MTK.debounce = function (fn, ms) {
     let t; return function () { clearTimeout(t); const a = arguments, c = this; t = setTimeout(() => fn.apply(c, a), ms); };
@@ -34,7 +44,7 @@
 
   function setData(data) {
     MTK.state.data = data;
-    MTK.state.analysis = MTK.insights.analyze(data);
+    MTK.state.analysis = MTK.insights.analyze(data, MTK.state.thresholds);
     el('connect-screen').classList.add('hidden');
     el('app-shell').classList.remove('hidden');
     el('org-label').textContent = data.org.name || ('Org ' + data.org.id);
@@ -42,9 +52,43 @@
     el('mode-label').className = 'mode-badge ' + (data.demo ? 'demo' : 'live');
     el('generated-label').textContent = 'Updated ' + new Date(data.generatedAt).toLocaleTimeString();
     updatePlanChrome();
+    updateModeChrome();
     if (!location.hash) location.hash = '#/overview';
     else onHashChange();
   }
+
+  // ---- Audience mode + thresholds -----------------------------------------
+  function updateModeChrome() {
+    const btn = el('mode-toggle-btn');
+    if (btn) {
+      const expert = MTK.state.mode === 'expert';
+      btn.textContent = expert ? 'Expert' : 'Guided';
+      btn.className = 'mode-toggle ' + (expert ? 'expert' : 'guided');
+      btn.title = expert ? 'Technical view — tap for non-technical' : 'Non-technical view — tap for technical';
+    }
+    const gear = el('btn-settings');
+    if (gear) gear.classList.toggle('hidden', MTK.state.mode !== 'expert');
+  }
+
+  MTK.setMode = function (mode) {
+    MTK.state.mode = mode === 'expert' ? 'expert' : 'guided';
+    try { localStorage.setItem('mtk_mode', MTK.state.mode); } catch (e) {}
+    updateModeChrome();
+    if (MTK.state.data) MTK.ui.render(MTK.state.route || 'overview');
+  };
+
+  MTK.toggleMode = function () { MTK.setMode(MTK.state.mode === 'expert' ? 'guided' : 'expert'); };
+
+  // Re-run the insights engine (after a threshold change) and refresh.
+  MTK.reanalyze = function (thresholds) {
+    if (thresholds) {
+      MTK.state.thresholds = thresholds;
+      try { localStorage.setItem('mtk_thresholds', JSON.stringify(thresholds)); } catch (e) {}
+    }
+    if (!MTK.state.data) return;
+    MTK.state.analysis = MTK.insights.analyze(MTK.state.data, MTK.state.thresholds);
+    MTK.ui.render(MTK.state.route || 'overview');
+  };
 
   // ---- Subscription / plan chrome -----------------------------------------
   function updatePlanChrome() {
@@ -205,6 +249,9 @@
     el('btn-refresh').onclick = refresh;
     el('btn-report').onclick = () => MTK.ui.printReport();
     el('plan-label').onclick = () => MTK.go('pricing');
+    el('mode-toggle-btn').onclick = () => MTK.toggleMode();
+    el('btn-settings').onclick = () => MTK.ui.openSettings();
+    updateModeChrome();
 
     document.querySelectorAll('.nav-tab').forEach((t) => t.onclick = () => MTK.go(t.dataset.route));
     window.addEventListener('hashchange', onHashChange);

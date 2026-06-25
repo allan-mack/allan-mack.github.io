@@ -72,7 +72,7 @@
     ]);
 
     const netList = (networks || []).map((n) => ({
-      id: n.id, name: n.name, productTypes: n.productTypes || [], timeZone: n.timeZone,
+      id: n.id, name: n.name, productTypes: n.productTypes || [], timeZone: n.timeZone, url: n.url,
     }));
     const nameById = {};
     netList.forEach((n) => { nameById[n.id] = n.name; });
@@ -85,7 +85,7 @@
     const statusList = (statuses || []).map((s) => ({
       serial: s.serial, name: s.name, model: s.model, networkId: s.networkId,
       productType: s.productType, status: s.status, lastReportedAt: s.lastReportedAt,
-      publicIp: s.publicIp,
+      firmware: s.firmware, lanIp: s.lanIp, publicIp: s.publicIp, url: s.url,
     }));
 
     const uplinkList = [];

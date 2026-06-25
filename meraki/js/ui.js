@@ -11,8 +11,19 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const can = (f) => MTK.plan.can(f);
   const limit = (k) => MTK.plan.limit(k);
+  const expert = () => MTK.state.mode === 'expert';
 
   const SEV_LABEL = { critical: 'Critical', warning: 'Warning', info: 'Heads-up', good: 'Healthy' };
+
+  // Best-effort deep-link into the Meraki dashboard for remediation. Uses the
+  // object's own dashboard URL when the API provides one, else the org URL.
+  function merakiUrl(obj) {
+    return (obj && obj.url) || (MTK.state.data && MTK.state.data.org && MTK.state.data.org.url) || 'https://dashboard.meraki.com';
+  }
+  function extLink(url, label, cls) {
+    if (!url) return '';
+    return `<a class="ext-link ${cls || ''}" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`;
+  }
 
   // ---- Glossary (educational layer for non-specialists) --------------------
   const GLOSSARY = {
@@ -174,14 +185,21 @@
       </section>`;
   }
   function findingCard(f) {
+    const ex = expert();
     return `
       <div class="card finding ${f.severity}">
-        <div class="finding-head"><span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span><span class="area-tag">${esc(f.area)}</span></div>
+        <div class="finding-head">
+          <span class="sev ${f.severity}">${SEV_LABEL[f.severity]}</span>
+          <span class="area-tag">${esc(f.area)}</span>
+          ${ex && f.rule ? `<span class="rule-id" title="Rule">${esc(f.rule)}</span>` : ''}
+          ${f.severity !== 'good' ? `<span class="finding-link">${extLink(merakiUrl(null), 'Open in Meraki')}</span>` : ''}
+        </div>
         <h3>${esc(f.title)}</h3>
         <p>${enrich(f.detail)}</p>
         ${f.impact ? `<p class="kv"><strong>Why it matters:</strong> ${enrich(f.impact)}</p>` : ''}
         ${f.action ? `<p class="kv action"><strong>What to do:</strong> ${enrich(f.action)}</p>` : ''}
-        ${f.evidence && f.evidence.length ? `<details><summary>Evidence (${f.evidence.length})</summary><ul>${f.evidence.map((e) => '<li>' + esc(e) + '</li>').join('')}</ul></details>` : ''}
+        ${ex && f.tech ? `<p class="tech-line"><code>${esc(f.tech)}</code></p>` : ''}
+        ${f.evidence && f.evidence.length ? `<details ${ex ? 'open' : ''}><summary>Evidence (${f.evidence.length})</summary><ul>${f.evidence.map((e) => '<li>' + esc(e) + '</li>').join('')}</ul></details>` : ''}
       </div>`;
   }
   // Auto-link known jargon inside finding text to the glossary.
@@ -213,6 +231,10 @@
     const shown = can('clients_all') ? filtered.slice(0, 200) : filtered.slice(0, cap);
     const hiddenCount = (d.clients || []).length - (can('clients_all') ? 0 : Math.min(cap, (d.clients || []).length));
 
+    const ex = expert();
+    const head = ex
+      ? ['Device', 'Site', 'Conn.', 'SSID', 'Signal', 'SNR', 'Latency', 'VLAN', 'MAC', 'IP', 'Usage (24h)', 'Status']
+      : ['Device', 'Site', 'Conn.', 'Signal', 'Latency', 'Usage (24h)', 'Status'];
     return `
       <section>
         <div class="card">
@@ -222,13 +244,28 @@
             <input id="client-search" class="search" placeholder="Search by name, MAC, vendor, SSID…" value="${esc(MTK.state.clientQuery || '')}">
             <span class="muted small">Sort:</span>
             ${['usage', 'signal', 'latency'].map((k) => `<button class="chip ${sort === k ? 'active' : ''}" data-csort="${k}">${k}</button>`).join('')}
+            ${can('export') ? '<button class="btn small-btn" data-export-csv>⬇ CSV</button>' : ''}
           </div>
         </div>
         <div class="card table-wrap">
           <table class="data">
-            <thead><tr><th>Device</th><th>Site</th><th>Conn.</th><th>Signal</th><th>Latency</th><th>Usage (24h)</th><th>Status</th></tr></thead>
+            <thead><tr>${head.map((h) => `<th>${h}</th>`).join('')}</tr></thead>
             <tbody>
-              ${shown.map((c) => `
+              ${shown.map((c) => ex ? `
+                <tr class="${can('client_detail') ? 'clickable' : ''}" data-client="${esc(c.id)}">
+                  <td><strong>${esc(c.description)}</strong><br><span class="muted small">${esc(c.manufacturer || '')} · ${esc(c.os || '')}</span></td>
+                  <td>${esc(netName(c.networkId))}</td>
+                  <td>${c.connectionType === 'wireless' ? '📶 Wi-Fi' : '🔌 wired'}</td>
+                  <td>${esc(c.ssid || '—')}</td>
+                  <td>${signalCell(c)}</td>
+                  <td>${c.snr != null ? esc(c.snr) + ' dB' : '<span class="muted">—</span>'}</td>
+                  <td>${c.avgLatencyMs != null ? latencyCell(c.avgLatencyMs) : '<span class="muted">—</span>'}</td>
+                  <td>${esc(c.vlan != null ? c.vlan : '—')}</td>
+                  <td class="mono small">${esc(c.mac || '—')}</td>
+                  <td class="mono small">${esc(c.ip || '—')}</td>
+                  <td>${fmtBytes(c.usageTotalBytes)}</td>
+                  <td><span class="badge ${c.status === 'Online' ? 'ok' : 'muted-badge'}">${esc(c.status)}</span></td>
+                </tr>` : `
                 <tr class="${can('client_detail') ? 'clickable' : ''}" data-client="${esc(c.id)}">
                   <td><strong>${esc(c.description)}</strong><br><span class="muted small">${esc(c.manufacturer || '')} · ${esc(c.os || '')}</span></td>
                   <td>${esc(netName(c.networkId))}</td>
@@ -312,12 +349,17 @@
                   <div class="small">${u.avgLatencyMs} ms · ${u.avgLossPercent}% loss</div>
                   ${can('trends') && u.latencySeries ? sparkline(u.latencySeries, { color: (u.avgLatencyMs >= 100 ? '#e15554' : '#2bb673'), w: 110, h: 28 }) : ''}
                 </div>`).join('')}</div>` : ''}
-              ${detail ? `<table class="data compact">
+              ${detail ? (expert() ? `<table class="data compact">
+                <thead><tr><th>Device</th><th>Model</th><th>Serial</th><th>Firmware</th><th>LAN IP</th><th>Status</th><th>Last seen</th><th></th></tr></thead>
+                <tbody>
+                  ${devs.map((s) => `<tr><td>${esc(s.name || s.serial)}</td><td class="muted">${esc(s.model || '')}</td><td class="mono small">${esc(s.serial || '')}</td><td class="mono small">${esc(s.firmware || '—')}</td><td class="mono small">${esc(s.lanIp || '—')}</td><td>${statusDot(s.status)} ${esc(s.status)}</td><td class="muted small">${timeAgo(s.lastReportedAt)}</td><td>${extLink(merakiUrl(s), 'Open')}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">No devices reported.</td></tr>'}
+                </tbody>
+              </table>` : `<table class="data compact">
                 <thead><tr><th>Device</th><th>Model</th><th>Type</th><th>Status</th><th>Last seen</th></tr></thead>
                 <tbody>
                   ${devs.map((s) => `<tr><td>${esc(s.name || s.serial)}</td><td class="muted">${esc(s.model || '')}</td><td>${esc(s.productType || '')}</td><td>${statusDot(s.status)} ${esc(s.status)}</td><td class="muted small">${timeAgo(s.lastReportedAt)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No devices reported.</td></tr>'}
                 </tbody>
-              </table>` : `<p class="muted small">${devs.filter((s) => s.status === 'online').length}/${devs.length} devices online.</p>`}
+              </table>`) : `<p class="muted small">${devs.filter((s) => s.status === 'online').length}/${devs.length} devices online.</p>`}
             </div>`;
         }).join('')}
         ${!detail ? nudge('networks_detail', 'Drill into every device & uplink', 'Upgrade to see each device\'s status and last-seen time, plus live uplink latency/loss sparklines for every site.') : ''}
@@ -369,6 +411,15 @@
         <div class="card">
           <h2>Help &amp; glossary</h2>
           <p class="muted">MerakiScope is built for managers, not network engineers. Here\'s what the terms mean and how to get the most out of the app. Underlined ${gloss('latency', 'terms')} anywhere in the app are tappable for a quick definition.</p>
+        </div>
+        <div class="card">
+          <h3>Two views: Guided and Expert</h3>
+          <p class="muted">Use the <strong>Guided / Expert</strong> toggle in the top bar to match your comfort level — your choice is remembered on this device.</p>
+          <ul class="help-steps">
+            <li><strong>Guided</strong> (non-technical): plain-English findings, friendly columns, and definitions — built for managers who aren\'t network engineers.</li>
+            <li><strong>Expert</strong> (technical): adds raw metrics and the exact measured-vs-threshold values on every finding, serial numbers, firmware, MAC/IP/VLAN/SNR columns, CSV export, and a ⚙ panel to <strong>tune the alert thresholds</strong> to your environment.</li>
+            <li>Either way, every issue has an <strong>“Open in Meraki ↗”</strong> link that jumps you to the dashboard to fix it.</li>
+          </ul>
         </div>
         <div class="card">
           <h3>Getting started</h3>
@@ -471,6 +522,49 @@
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
+  // ---- CSV export (technical) ---------------------------------------------
+  function csvCell(v) { if (v == null) return ''; const s = String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function exportClientsCSV() {
+    const d = MTK.state.data; if (!d) return;
+    const cols = ['description', 'mac', 'ip', 'site', 'connection', 'ssid', 'vlan', 'rssi_dBm', 'snr_dB', 'latency_ms', 'sent_bytes', 'recv_bytes', 'total_bytes', 'status', 'lastSeen'];
+    const rows = (d.clients || []).map((c) => [c.description, c.mac, c.ip, netName(c.networkId), c.connectionType, c.ssid, c.vlan, c.rssi, c.snr, c.avgLatencyMs, c.usageSentBytes, c.usageRecvBytes, c.usageTotalBytes, c.status, c.lastSeen]);
+    const csv = [cols].concat(rows).map((r) => r.map(csvCell).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'merakiscope-clients-' + String(d.org.name || 'org').replace(/\W+/g, '_') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  // ---- Threshold settings (Expert) ----------------------------------------
+  function openSettings() {
+    const t = Object.assign({}, MTK.insights.DEFAULT_THRESHOLDS, MTK.state.thresholds);
+    const fields = [
+      ['rssiWeak', 'Weak signal cutoff (dBm)'], ['weakSharePct', 'Weak-client share to flag (%)'],
+      ['utilWarn', 'Channel util warn (%)'], ['utilCrit', 'Channel util critical (%)'],
+      ['lossWarn', 'Uplink loss warn (%)'], ['lossCrit', 'Uplink loss critical (%)'],
+      ['latWarn', 'Uplink latency warn (ms)'], ['latCrit', 'Uplink latency critical (ms)'],
+      ['wifiFailWarn', 'Wi-Fi join fail warn (%)'], ['wifiFailCrit', 'Wi-Fi join fail critical (%)'],
+      ['clientLatHigh', 'Client high latency (ms)'], ['failedConnPct', 'Failed-connection share (%)'],
+      ['appLatWarn', 'App latency warn (ms)'], ['appLossWarn', 'App loss warn (%)'],
+      ['licenseWarnDays', 'License warning (days)'], ['topTalkerSharePct', 'Top-talker share (%)'],
+    ];
+    const html = `
+      <div class="modal-head"><h2>Tune thresholds</h2><button class="icon-btn" data-close-modal>✕</button></div>
+      <div class="modal-body">
+        <p class="muted">Match the insights engine to your environment. Changes apply instantly and are saved on this device only.</p>
+        <div class="settings-grid">${fields.map((f) => `<label class="set-field">${esc(f[1])}<input type="number" step="any" data-thr="${f[0]}" value="${esc(t[f[0]])}"></label>`).join('')}</div>
+        <div class="set-actions"><button class="btn primary" id="thr-save">Apply</button><button class="btn" id="thr-reset">Reset to defaults</button></div>
+      </div>`;
+    openModal(html);
+    el('thr-save').onclick = () => {
+      const o = {};
+      document.querySelectorAll('[data-thr]').forEach((i) => { const v = parseFloat(i.value); if (!isNaN(v)) o[i.dataset.thr] = v; });
+      closeModal(); MTK.reanalyze(o);
+    };
+    el('thr-reset').onclick = () => { closeModal(); MTK.reanalyze({}); };
+  }
+
   // ========================================================================
   // Router + events
   // ========================================================================
@@ -491,7 +585,8 @@
     document.querySelectorAll('[data-filter-nav]').forEach((b) => b.onclick = () => { MTK.state.insightFilter = b.dataset.filterNav; MTK.go('insights'); });
     document.querySelectorAll('[data-csort]').forEach((b) => b.onclick = () => { MTK.state.clientSort = b.dataset.csort; render('clients'); });
     document.querySelectorAll('[data-upgrade]').forEach((b) => b.onclick = () => MTK.subscribe(b.dataset.upgrade));
-    document.querySelectorAll('[data-client]').forEach((r) => { if (r.classList.contains('clickable')) r.onclick = () => openClientDetail(r.dataset.client); });
+    document.querySelectorAll('[data-client]').forEach((r) => { if (r.classList.contains('clickable')) r.onclick = (e) => { if (e.target.closest('a')) return; openClientDetail(r.dataset.client); }; });
+    document.querySelectorAll('[data-export-csv]').forEach((b) => b.onclick = exportClientsCSV);
     document.querySelectorAll('.gloss-term').forEach((g) => {
       g.onclick = (e) => { e.stopPropagation(); showGloss(g, g.dataset.term); };
       g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); showGloss(g, g.dataset.term); } };
@@ -516,5 +611,5 @@
   }
 
   global.MTK = global.MTK || {};
-  global.MTK.ui = { render, esc, closeModal, printReport, openModal };
+  global.MTK.ui = { render, esc, closeModal, printReport, openModal, openSettings, exportClientsCSV };
 })(window);

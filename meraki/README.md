@@ -151,6 +151,29 @@ To go live, drop in Stripe Checkout (web) or Apple/Google in-app purchase
 (installed app) and call `MTK.plan.set(tier)` from the success callback — no
 other code changes are needed because entitlements are already centralized.
 
+## One tool for non-technical *and* technical users
+
+A top-bar **Guided / Expert** toggle reshapes the whole app for the person using
+it (the choice is remembered per device):
+
+| | **Guided** (non-technical) | **Expert** (technical) |
+|---|---|---|
+| Insight language | Plain English: what / why / what to do | Same, **plus** a `measured vs. threshold` line and the rule id on every finding |
+| Client table | Friendly columns (signal, latency, usage) | Adds SSID, SNR, VLAN, MAC, IP (monospace) |
+| Device table | Name, model, status | Adds serial, firmware, LAN IP, per-device deep-link |
+| Thresholds | Sensible defaults | **⚙ Tune thresholds** — RSSI, utilization, loss, latency, join-failure %, license window… applied instantly and saved locally |
+| Export | — | **CSV export** of all clients |
+| Remediation | “Open in Meraki ↗” on every issue | Same, plus per-device links |
+
+This is the core of the product: the same engine, presented so a non-technical
+manager isn't overwhelmed and a network engineer isn't condescended to. The
+**“Open in Meraki ↗”** deep-links turn it from read-only into a starting point
+for action; the **tunable thresholds** let technical users stop the false
+alarms that generic, hard-coded limits cause.
+
+> Deep-links use the dashboard URL the Meraki API provides for each
+> network/device when available, falling back to the organization URL.
+
 ## Designed to be understood
 
 Because the audience is technology managers, not network engineers:

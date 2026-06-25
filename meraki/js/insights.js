@@ -2,14 +2,40 @@
  * insights.js — the analysis brain of MerakiScope.
  *
  * Takes the normalized data model (from mock.js or api.js) and runs a series of
- * rules over it. Each rule returns zero or more "findings". A finding is written
- * for an amateur technology manager: it says, in plain English, what was found,
- * why it matters, and what to do about it.
+ * rules over it. Each rule returns zero or more "findings". A finding carries
+ * BOTH a plain-English explanation (for non-technical managers) and an optional
+ * `tech` one-liner with the measured value vs. the threshold (for engineers in
+ * Expert mode).
+ *
+ * Thresholds are tunable: analyze(data, overrides) merges overrides onto
+ * DEFAULT_THRESHOLDS so technical users can match the tool to their environment.
  *
  * Severity scale: 'good' | 'info' | 'warning' | 'critical'
  */
 (function (global) {
   'use strict';
+
+  const DEFAULT_THRESHOLDS = {
+    rssiWeak: -72,        // dBm; at or below this a client is "weak"
+    weakSharePct: 12,     // % of wireless clients weak before we flag (warn at 2x)
+    utilWarn: 50,         // % channel utilization = congested
+    utilCrit: 70,         // % channel utilization = critical
+    lossWarn: 1,          // % uplink packet loss
+    lossCrit: 3,
+    latWarn: 100,         // ms uplink latency
+    latCrit: 150,
+    wifiFailWarn: 8,      // % wireless join failures
+    wifiFailCrit: 15,
+    clientLatHigh: 100,   // ms per-client latency
+    failedConnPct: 5,     // % of clients with a failed connection
+    appLatWarn: 120,      // ms application latency
+    appLossWarn: 1.5,     // % application loss
+    appLossCrit: 3,
+    licenseWarnDays: 45,  // days to expiry before warning
+    topTalkerSharePct: 50,// % of bandwidth used by top 5
+  };
+
+  let T = Object.assign({}, DEFAULT_THRESHOLDS); // active thresholds (set in analyze)
 
   function fmtBytes(n) {
     if (n == null) return '—';
@@ -21,7 +47,7 @@
 
   function finding(o) {
     return Object.assign({
-      severity: 'info', area: 'General', title: '', detail: '', impact: '', action: '', evidence: [],
+      severity: 'info', area: 'General', rule: '', title: '', detail: '', impact: '', action: '', tech: '', evidence: [], link: null,
     }, o);
   }
 
@@ -36,30 +62,33 @@
 
     if (offline.length === 0 && alerting.length === 0) {
       out.push(finding({
-        severity: 'good', area: 'Device health',
+        severity: 'good', area: 'Device health', rule: 'device.availability',
         title: 'All hardware is online',
         detail: `Every one of your ${total} Meraki device${total === 1 ? '' : 's'} is reporting in to the cloud.`,
         impact: 'A fully online fleet means no site is running blind or relying on a backup path.',
         action: 'No action needed. Keep an eye on the dashboard for new alerts.',
+        tech: `${total}/${total} devices reporting; 0 offline, 0 alerting.`,
       }));
     } else {
       if (offline.length) {
         out.push(finding({
-          severity: 'critical', area: 'Device health',
+          severity: 'critical', area: 'Device health', rule: 'device.offline',
           title: `${offline.length} device${offline.length === 1 ? ' is' : 's are'} offline`,
           detail: `These devices have stopped reporting to Meraki and are likely down or disconnected.`,
           impact: 'Users behind an offline switch or access point lose connectivity; an offline appliance can take a whole site offline.',
           action: 'Check power and the upstream link for each device. If it has a cellular/secondary uplink, confirm traffic failed over. Visit the site if it stays down.',
+          tech: `${offline.length}/${total} devices offline: ` + offline.map((s) => `${s.serial}@${s.model || '?'}`).join(', '),
           evidence: offline.map((s) => `${s.name || s.serial} (${s.model || '?'}) — last seen ${timeAgo(s.lastReportedAt)}`),
         }));
       }
       if (alerting.length) {
         out.push(finding({
-          severity: 'warning', area: 'Device health',
+          severity: 'warning', area: 'Device health', rule: 'device.alerting',
           title: `${alerting.length} device${alerting.length === 1 ? ' is' : 's are'} in an alerting state`,
           detail: 'These devices are online but reporting a problem (for example a bad port, PoE issue, or failed uplink).',
           impact: 'Performance may be degraded even though the device still appears connected.',
           action: 'Open each device in the Meraki dashboard and review its alert details.',
+          tech: `${alerting.length} alerting: ` + alerting.map((s) => s.serial).join(', '),
           evidence: alerting.map((s) => `${s.name || s.serial} (${s.model || '?'})`),
         }));
       }
@@ -72,31 +101,33 @@
     const rows = d.uplinkLossLatency || [];
     const netName = byId(d.networks, 'id', 'name');
 
-    const bad = rows.filter((r) => (r.avgLossPercent != null && r.avgLossPercent >= 1) || (r.avgLatencyMs != null && r.avgLatencyMs >= 100));
-    const great = rows.filter((r) => (r.avgLossPercent != null && r.avgLossPercent < 1) && (r.avgLatencyMs != null && r.avgLatencyMs < 60));
+    const bad = rows.filter((r) => (r.avgLossPercent != null && r.avgLossPercent >= T.lossWarn) || (r.avgLatencyMs != null && r.avgLatencyMs >= T.latWarn));
+    const great = rows.filter((r) => (r.avgLossPercent != null && r.avgLossPercent < T.lossWarn) && (r.avgLatencyMs != null && r.avgLatencyMs < 60));
 
     bad.forEach((r) => {
       const reasons = [];
-      if (r.avgLossPercent >= 1) reasons.push(`${r.avgLossPercent}% packet loss`);
-      if (r.avgLatencyMs >= 100) reasons.push(`${r.avgLatencyMs} ms latency`);
+      if (r.avgLossPercent >= T.lossWarn) reasons.push(`${r.avgLossPercent}% packet loss`);
+      if (r.avgLatencyMs >= T.latWarn) reasons.push(`${r.avgLatencyMs} ms latency`);
       out.push(finding({
-        severity: r.avgLossPercent >= 3 || r.avgLatencyMs >= 150 ? 'critical' : 'warning',
-        area: 'Internet uplink',
+        severity: r.avgLossPercent >= T.lossCrit || r.avgLatencyMs >= T.latCrit ? 'critical' : 'warning',
+        area: 'Internet uplink', rule: 'uplink.lossLatency',
         title: `${netName(r.networkId) || 'A site'} has an unhealthy internet connection (${r.uplink})`,
         detail: `The link to the internet is showing ${reasons.join(' and ')}.`,
         impact: 'Packet loss and high latency cause choppy video calls, laggy cloud apps, and dropped VoIP — the problems users complain about most.',
         action: 'Run a cable/modem check, reboot the ISP modem, and open a ticket with the internet provider citing the loss/latency figures. If a secondary uplink exists, consider failing critical traffic over to it.',
+        tech: `${r.serial || ''} ${r.uplink}: loss ${r.avgLossPercent}% (thr ${T.lossWarn}/${T.lossCrit}), latency ${r.avgLatencyMs} ms (thr ${T.latWarn}/${T.latCrit}), 5-min avg.`,
         evidence: [`${r.uplink}: loss ${r.avgLossPercent}%, latency ${r.avgLatencyMs} ms (5-min average)`],
       }));
     });
 
     if (great.length && !bad.length) {
       out.push(finding({
-        severity: 'good', area: 'Internet uplink',
+        severity: 'good', area: 'Internet uplink', rule: 'uplink.lossLatency',
         title: 'Internet connections are healthy',
         detail: `All measured uplinks show low packet loss and low latency.`,
         impact: 'Low loss and latency are the foundation of good call quality and snappy cloud apps.',
         action: 'No action needed.',
+        tech: `${great.length} uplink(s) within thresholds (loss < ${T.lossWarn}%, latency < 60 ms).`,
       }));
     }
     return out;
@@ -107,11 +138,12 @@
     const failed = (d.uplinks || []).filter((u) => u.status === 'failed');
     if (failed.length) {
       out.push(finding({
-        severity: 'warning', area: 'Internet uplink',
+        severity: 'warning', area: 'Internet uplink', rule: 'uplink.status',
         title: `${failed.length} WAN link${failed.length === 1 ? ' is' : 's are'} down`,
         detail: 'One or more internet uplinks are in a failed state.',
         impact: 'If a site is running on a single remaining link, there is no backup left — the next failure takes the site offline.',
         action: 'Confirm whether the site has already failed over to a backup link, then restore the failed link (ISP, modem, or cabling).',
+        tech: failed.map((u) => `${u.serial} ${u.interface}=failed`).join(', '),
         evidence: failed.map((u) => `${u.serial} ${u.interface} (${u.provider || 'unknown ISP'})`),
       }));
     }
@@ -121,24 +153,26 @@
   function ruleChannelUtilization(d) {
     const out = [];
     const rows = d.channelUtilization || [];
-    const hot = rows.filter((r) => r.utilizationTotal != null && r.utilizationTotal >= 50);
+    const hot = rows.filter((r) => r.utilizationTotal != null && r.utilizationTotal >= T.utilWarn);
     if (hot.length) {
       out.push(finding({
-        severity: hot.some((r) => r.utilizationTotal >= 70) ? 'critical' : 'warning',
-        area: 'Wi-Fi airtime',
+        severity: hot.some((r) => r.utilizationTotal >= T.utilCrit) ? 'critical' : 'warning',
+        area: 'Wi-Fi airtime', rule: 'wifi.channelUtil',
         title: `${hot.length} radio${hot.length === 1 ? ' is' : 's are'} congested`,
         detail: 'These access-point radios are busy more than half the time. Wi-Fi is a shared medium — when the airtime fills up, everyone nearby slows down.',
         impact: 'Users in these areas see slow Wi-Fi, buffering, and dropped calls even when the internet itself is fine.',
         action: 'Reduce 2.4 GHz usage (it is the most crowded band), enable band steering, add an access point in busy areas, or check for non-Meraki interference. Move high-bandwidth clients to 5/6 GHz.',
+        tech: `${hot.length} radio(s) ≥ ${T.utilWarn}% util (crit ${T.utilCrit}%): ` + hot.map((r) => `${r.serial}/${r.band}GHz=${r.utilizationTotal}%`).join(', '),
         evidence: hot.map((r) => `${r.name || r.serial} — ${r.band} GHz at ${r.utilizationTotal}% airtime`),
       }));
     } else if (rows.length) {
       out.push(finding({
-        severity: 'good', area: 'Wi-Fi airtime',
+        severity: 'good', area: 'Wi-Fi airtime', rule: 'wifi.channelUtil',
         title: 'Wi-Fi airwaves have plenty of headroom',
         detail: 'No access-point radio is heavily congested.',
         impact: 'Clear airtime means the Wi-Fi can absorb busy periods without slowing down.',
         action: 'No action needed.',
+        tech: `${rows.length} radios measured; max util < ${T.utilWarn}%.`,
       }));
     }
     return out;
@@ -149,30 +183,32 @@
     (d.wirelessHealth || []).forEach((w) => {
       const failures = (w.auth || 0) + (w.dhcp || 0) + (w.assoc || 0) + (w.dns || 0);
       const rate = w.failureRatePct;
-      if (rate != null && rate >= 8) {
+      if (rate != null && rate >= T.wifiFailWarn) {
         const culprits = [];
         if (w.auth >= 10) culprits.push('authentication (password / RADIUS)');
         if (w.dhcp >= 10) culprits.push('DHCP (handing out IP addresses)');
         if (w.assoc >= 10) culprits.push('association (signal / capacity)');
         if (w.dns >= 10) culprits.push('DNS lookups');
         out.push(finding({
-          severity: rate >= 15 ? 'critical' : 'warning',
-          area: 'Client experience',
+          severity: rate >= T.wifiFailCrit ? 'critical' : 'warning',
+          area: 'Client experience', rule: 'wifi.connectionStats',
           title: `${w.networkName}: ${rate}% of Wi-Fi connection attempts are failing`,
           detail: `Out of every 100 join attempts, about ${Math.round(rate)} do not complete${culprits.length ? '. The main stage failing is ' + culprits.join(', ') + '.' : '.'}`,
           impact: 'Users experience "it won\'t connect" or "it keeps asking for the password" — one of the most common help-desk complaints.',
           action: culprits.length
             ? 'Focus on the failing stage above: verify the Wi-Fi password/RADIUS server for auth, check the DHCP scope is not exhausted for DHCP, and add coverage for association problems.'
             : 'Review the network\'s wireless health page in Meraki to pinpoint which stage fails.',
+          tech: `failRate ${rate}% (thr ${T.wifiFailWarn}/${T.wifiFailCrit}); assoc ${w.assoc} auth ${w.auth} dhcp ${w.dhcp} dns ${w.dns} vs success ${w.success}.`,
           evidence: [`Successful: ${w.success}, failed: ${failures} (assoc ${w.assoc}, auth ${w.auth}, DHCP ${w.dhcp}, DNS ${w.dns})`],
         }));
       } else if (rate != null) {
         out.push(finding({
-          severity: 'good', area: 'Client experience',
+          severity: 'good', area: 'Client experience', rule: 'wifi.connectionStats',
           title: `${w.networkName}: Wi-Fi connections are succeeding`,
           detail: `Only about ${rate}% of join attempts fail, which is within a healthy range.`,
           impact: 'Reliable joins mean fewer "I can\'t get on the Wi-Fi" tickets.',
           action: 'No action needed.',
+          tech: `failRate ${rate}% < ${T.wifiFailWarn}% threshold.`,
         }));
       }
     });
@@ -183,25 +219,27 @@
     const out = [];
     const wireless = (d.clients || []).filter((c) => c.connectionType === 'wireless' && c.rssi != null);
     if (!wireless.length) return out;
-    const weak = wireless.filter((c) => c.rssi <= -72);
+    const weak = wireless.filter((c) => c.rssi <= T.rssiWeak);
     const pct = Math.round((weak.length / wireless.length) * 100);
-    if (pct >= 12) {
+    if (pct >= T.weakSharePct) {
       out.push(finding({
-        severity: pct >= 25 ? 'warning' : 'info',
-        area: 'Client experience',
+        severity: pct >= T.weakSharePct * 2 ? 'warning' : 'info',
+        area: 'Client experience', rule: 'client.weakSignal',
         title: `${pct}% of Wi-Fi clients have a weak signal`,
-        detail: `${weak.length} of ${wireless.length} wireless clients are connected at -72 dBm or worse. At that signal level devices drop to slower speeds and retransmit a lot.`,
+        detail: `${weak.length} of ${wireless.length} wireless clients are connected at ${T.rssiWeak} dBm or worse. At that signal level devices drop to slower speeds and retransmit a lot.`,
         impact: 'Weak-signal clients feel slow even on a fast network, and they drag down airtime for everyone else on the same access point.',
         action: 'Look at where these clients are. You likely have coverage gaps — add or reposition an access point, or reduce obstructions. Encourage 5/6 GHz where signal allows.',
+        tech: `${weak.length}/${wireless.length} clients ≤ ${T.rssiWeak} dBm (${pct}%, flag ≥ ${T.weakSharePct}%).`,
         evidence: weak.slice(0, 6).map((c) => `${c.description} on ${c.ssid || 'Wi-Fi'} — ${c.rssi} dBm`),
       }));
     } else {
       out.push(finding({
-        severity: 'good', area: 'Client experience',
+        severity: 'good', area: 'Client experience', rule: 'client.weakSignal',
         title: 'Wi-Fi signal strength looks healthy',
         detail: `Only ${pct}% of wireless clients have a weak signal.`,
         impact: 'Strong signal keeps devices on fast data rates and off the air quickly.',
         action: 'No action needed.',
+        tech: `${pct}% ≤ ${T.rssiWeak} dBm, under ${T.weakSharePct}% flag.`,
       }));
     }
     return out;
@@ -211,14 +249,15 @@
     const out = [];
     const measured = (d.clients || []).filter((c) => c.avgLatencyMs != null);
     if (!measured.length) return out;
-    const laggy = measured.filter((c) => c.avgLatencyMs >= 100);
+    const laggy = measured.filter((c) => c.avgLatencyMs >= T.clientLatHigh);
     if (laggy.length >= Math.max(3, measured.length * 0.05)) {
       out.push(finding({
-        severity: 'warning', area: 'Client experience',
+        severity: 'warning', area: 'Client experience', rule: 'client.latency',
         title: `${laggy.length} clients are seeing high latency`,
-        detail: 'These devices have round-trip times of 100 ms or more to the network.',
+        detail: 'These devices have round-trip times of ' + T.clientLatHigh + ' ms or more to the network.',
         impact: 'High latency makes everything feel sluggish — typing in cloud apps, voice calls, and screen sharing all suffer.',
         action: 'Cross-check whether these clients share an access point (Wi-Fi problem) or a site (uplink problem). The Insights here usually point to the common cause.',
+        tech: `${laggy.length}/${measured.length} clients ≥ ${T.clientLatHigh} ms.`,
         evidence: laggy.slice(0, 6).map((c) => `${c.description} — ${c.avgLatencyMs} ms`),
       }));
     }
@@ -230,13 +269,14 @@
     const fails = (d.clients || []).filter((c) => c.failedConnection);
     const total = (d.clients || []).length || 1;
     const pct = Math.round((fails.length / total) * 100);
-    if (fails.length && pct >= 5) {
+    if (fails.length && pct >= T.failedConnPct) {
       out.push(finding({
-        severity: 'warning', area: 'Client experience',
+        severity: 'warning', area: 'Client experience', rule: 'client.failedConn',
         title: `${pct}% of clients hit a failed connection recently`,
         detail: `${fails.length} clients recorded at least one failed connection attempt.`,
         impact: 'Repeated failures are what users describe as "it keeps dropping" or "I have to reconnect all the time."',
         action: 'Group these clients by access point and SSID. A cluster on one AP points to that radio; a spread across one SSID points to its settings (auth/DHCP).',
+        tech: `${fails.length}/${total} clients with ≥1 failed conn (${pct}%, flag ≥ ${T.failedConnPct}%).`,
         evidence: fails.slice(0, 6).map((c) => `${c.description} (${c.manufacturer || '?'})`),
       }));
     }
@@ -246,30 +286,32 @@
   function ruleApplicationExperience(d) {
     const out = [];
     const apps = (d.applications || []).filter((a) => a.avgLatencyMs != null || a.lossPercent != null);
-    const stressed = apps.filter((a) => (a.avgLatencyMs != null && a.avgLatencyMs >= 120) || (a.lossPercent != null && a.lossPercent >= 1.5));
+    const stressed = apps.filter((a) => (a.avgLatencyMs != null && a.avgLatencyMs >= T.appLatWarn) || (a.lossPercent != null && a.lossPercent >= T.appLossWarn));
     stressed.forEach((a) => {
       const reasons = [];
-      if (a.avgLatencyMs != null && a.avgLatencyMs >= 120) reasons.push(`${a.avgLatencyMs} ms latency`);
-      if (a.lossPercent != null && a.lossPercent >= 1.5) reasons.push(`${a.lossPercent}% loss`);
+      if (a.avgLatencyMs != null && a.avgLatencyMs >= T.appLatWarn) reasons.push(`${a.avgLatencyMs} ms latency`);
+      if (a.lossPercent != null && a.lossPercent >= T.appLossWarn) reasons.push(`${a.lossPercent}% loss`);
       out.push(finding({
-        severity: a.lossPercent >= 3 ? 'critical' : 'warning',
-        area: 'Application experience',
+        severity: a.lossPercent >= T.appLossCrit ? 'critical' : 'warning',
+        area: 'Application experience', rule: 'app.experience',
         title: `${a.name} is performing poorly`,
         detail: `This ${a.category || 'application'} is showing ${reasons.join(' and ')} for the ~${a.numClients || 'several'} people using it.`,
         impact: a.category && /video|conferenc/i.test(a.category)
           ? 'For real-time apps this means frozen video, robotic audio, and dropped calls.'
           : 'Users will see spinning loaders, timeouts, and slow saves in this app.',
         action: 'Confirm whether the problem is the network path (check the site uplink) or the app/SaaS provider itself. Consider a traffic-shaping rule to prioritize this app if it is business-critical.',
+        tech: `${a.name}: lat ${a.avgLatencyMs ?? '—'} ms (thr ${T.appLatWarn}), loss ${a.lossPercent ?? '—'}% (thr ${T.appLossWarn}/${T.appLossCrit}), ${a.numClients || '?'} clients, ${fmtBytes(a.usageTotalBytes)}.`,
         evidence: [`${a.name}: latency ${a.avgLatencyMs ?? '—'} ms, loss ${a.lossPercent ?? '—'}%, ~${fmtBytes(a.usageTotalBytes)} used`],
       }));
     });
     if (apps.length && !stressed.length) {
       out.push(finding({
-        severity: 'good', area: 'Application experience',
+        severity: 'good', area: 'Application experience', rule: 'app.experience',
         title: 'Top applications are performing well',
         detail: 'None of your most-used applications show high latency or loss.',
         impact: 'Smooth app performance is what end users actually notice day to day.',
         action: 'No action needed.',
+        tech: `${apps.length} apps measured; all under ${T.appLatWarn} ms / ${T.appLossWarn}% loss.`,
       }));
     }
     return out;
@@ -281,27 +323,30 @@
     if (lic.daysToExpiration != null) {
       if (lic.daysToExpiration <= 0) {
         out.push(finding({
-          severity: 'critical', area: 'Licensing',
+          severity: 'critical', area: 'Licensing', rule: 'license.expiry',
           title: 'Your Meraki license has expired',
           detail: 'Devices may stop passing traffic or lose dashboard management when a license lapses.',
           impact: 'An expired license can disable the network — this is urgent.',
           action: 'Renew immediately through your Meraki reseller or Cisco account team.',
+          tech: `daysToExpiration=${lic.daysToExpiration}; status=${lic.status || '?'}.`,
         }));
-      } else if (lic.daysToExpiration <= 45) {
+      } else if (lic.daysToExpiration <= T.licenseWarnDays) {
         out.push(finding({
-          severity: 'warning', area: 'Licensing',
+          severity: 'warning', area: 'Licensing', rule: 'license.expiry',
           title: `License expires in ${lic.daysToExpiration} days`,
           detail: 'Meraki is subscription-based; hardware needs an active license to keep working.',
           impact: 'Letting it lapse risks losing management and, eventually, traffic.',
           action: 'Start the renewal now so it is approved before the deadline. Confirm device counts match what you own.',
+          tech: `daysToExpiration=${lic.daysToExpiration} (warn ≤ ${T.licenseWarnDays}); expires ${lic.expirationDate || '?'}.`,
         }));
       } else {
         out.push(finding({
-          severity: 'good', area: 'Licensing',
+          severity: 'good', area: 'Licensing', rule: 'license.expiry',
           title: `Licensing is in good standing (${lic.daysToExpiration} days remaining)`,
           detail: 'Your subscription has comfortable runway.',
           impact: 'No risk of a license-driven outage in the near term.',
           action: 'Set a calendar reminder ~60 days before expiry.',
+          tech: `daysToExpiration=${lic.daysToExpiration} > ${T.licenseWarnDays}.`,
         }));
       }
     }
@@ -316,13 +361,14 @@
     const top5 = clients.slice(0, 5);
     const top5Usage = top5.reduce((a, c) => a + (c.usageTotalBytes || 0), 0);
     const share = Math.round((top5Usage / totalUsage) * 100);
-    if (share >= 50) {
+    if (share >= T.topTalkerSharePct) {
       out.push(finding({
-        severity: 'info', area: 'Capacity',
+        severity: 'info', area: 'Capacity', rule: 'capacity.topTalkers',
         title: `A handful of devices are using ${share}% of all bandwidth`,
         detail: `Your top 5 clients account for ${fmtBytes(top5Usage)} of ${fmtBytes(totalUsage)} total traffic.`,
         impact: 'A few heavy users can crowd out everyone else, especially on a smaller internet connection.',
         action: 'Check what these devices are doing (large backups, streaming, updates). If it is non-essential, schedule it after hours or apply a per-client bandwidth limit.',
+        tech: `top5 share ${share}% (flag ≥ ${T.topTalkerSharePct}%); ${fmtBytes(top5Usage)} / ${fmtBytes(totalUsage)}.`,
         evidence: top5.map((c) => `${c.description} — ${fmtBytes(c.usageTotalBytes)}`),
       }));
     }
@@ -355,7 +401,8 @@
     ruleLicensing, ruleTopTalkers,
   ];
 
-  function analyze(d) {
+  function analyze(d, overrides) {
+    T = Object.assign({}, DEFAULT_THRESHOLDS, overrides || {});
     let findings = [];
     RULES.forEach((r) => {
       try { findings = findings.concat(r(d) || []); }
@@ -368,9 +415,8 @@
     const counts = { critical: 0, warning: 0, info: 0, good: 0 };
     findings.forEach((f) => { counts[f.severity]++; });
 
-    // Health score: start at 100 and subtract weighted penalties. Each severity's
-    // contribution is capped so a handful of issues doesn't instantly pin the
-    // score at 0 — the score stays a meaningful gauge rather than a binary.
+    // Health score: start at 100 and subtract weighted penalties, capped per
+    // severity so a few issues don't instantly pin the score to 0.
     const penalty =
       Math.min(counts.critical, 3) * 16 +
       Math.min(counts.warning, 6) * 7 +
@@ -382,9 +428,9 @@
     else if (score < 70) grade = 'Fair';
     else if (score < 85) grade = 'Good';
 
-    return { findings, counts, score, grade };
+    return { findings, counts, score, grade, thresholds: Object.assign({}, T) };
   }
 
   global.MTK = global.MTK || {};
-  global.MTK.insights = { analyze, fmtBytes, timeAgo };
+  global.MTK.insights = { analyze, fmtBytes, timeAgo, DEFAULT_THRESHOLDS };
 })(window);

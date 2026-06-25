@@ -74,6 +74,7 @@
       name: n.name,
       productTypes: n.types,
       timeZone: 'America/Los_Angeles',
+      url: 'https://dashboard.meraki.com',
     }));
 
     // ---- Devices -----------------------------------------------------------
@@ -95,7 +96,7 @@
         // Boise branch appliance is offline in the demo to drive an insight.
         const offline = ni === 2;
         devices.push({ serial, name: `${net.name} MX67`, model: 'MX67', networkId: net.id, productType: 'appliance', lanIp: `10.${ni}.0.1` });
-        deviceStatuses.push({ serial, name: `${net.name} MX67`, model: 'MX67', networkId: net.id, productType: 'appliance', status: offline ? 'offline' : 'online', lastReportedAt: offline ? isoMinutesAgo(47) : isoMinutesAgo(1), publicIp: `203.0.113.${10 + ni}` });
+        deviceStatuses.push({ serial, name: `${net.name} MX67`, model: 'MX67', firmware: 'MX 18.107.2', networkId: net.id, productType: 'appliance', status: offline ? 'offline' : 'online', lastReportedAt: offline ? isoMinutesAgo(47) : isoMinutesAgo(1), lanIp: `10.${ni}.0.1`, publicIp: `203.0.113.${10 + ni}`, url: 'https://dashboard.meraki.com' });
 
         const wan1Loss = ni === 1 ? between(rand, 2.5, 5.5) : between(rand, 0, 0.6);
         const wan1Lat = ni === 1 ? between(rand, 120, 240) : between(rand, 8, 35);
@@ -113,7 +114,7 @@
       for (let i = 0; i < switchesPerNet; i++) {
         const serial = `Q2SW-${ni}${i}-${2000 + ni}`;
         devices.push({ serial, name: `${net.name} SW${i + 1}`, model: 'MS225-48', networkId: net.id, productType: 'switch', lanIp: `10.${ni}.0.${10 + i}` });
-        deviceStatuses.push({ serial, name: `${net.name} SW${i + 1}`, model: 'MS225-48', networkId: net.id, productType: 'switch', status: 'online', lastReportedAt: isoMinutesAgo(1) });
+        deviceStatuses.push({ serial, name: `${net.name} SW${i + 1}`, model: 'MS225-48', firmware: 'MS 15.21.1', networkId: net.id, productType: 'switch', status: 'online', lastReportedAt: isoMinutesAgo(1), lanIp: `10.${ni}.0.${10 + i}`, url: 'https://dashboard.meraki.com' });
       }
 
       // Access points (MR)
@@ -124,7 +125,7 @@
         const offline = ni === 1 && i === 2;
         const congested = ni === 0 && i === 4;
         devices.push({ serial, name: `${net.name} AP${i + 1}`, model: 'MR46', networkId: net.id, productType: 'wireless', lanIp: `10.${ni}.0.${30 + i}` });
-        deviceStatuses.push({ serial, name: `${net.name} AP${i + 1}`, model: 'MR46', networkId: net.id, productType: 'wireless', status: offline ? 'offline' : 'online', lastReportedAt: offline ? isoMinutesAgo(63) : isoMinutesAgo(1) });
+        deviceStatuses.push({ serial, name: `${net.name} AP${i + 1}`, model: 'MR46', firmware: 'MR 30.7', networkId: net.id, productType: 'wireless', status: offline ? 'offline' : 'online', lastReportedAt: offline ? isoMinutesAgo(63) : isoMinutesAgo(1), lanIp: `10.${ni}.0.${30 + i}`, url: 'https://dashboard.meraki.com' });
 
         const util24 = congested ? between(rand, 62, 78) : between(rand, 8, 30);
         const util5 = congested ? between(rand, 55, 70) : between(rand, 5, 25);
