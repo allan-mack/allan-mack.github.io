@@ -5,6 +5,7 @@
   'use strict';
 
   const MTK = global.MTK = global.MTK || {};
+  MTK.VERSION = 'v1.1';
   MTK.state = {
     route: 'overview',
     data: null,
@@ -40,8 +41,45 @@
     el('mode-label').textContent = data.demo ? 'Demo data' : 'Live';
     el('mode-label').className = 'mode-badge ' + (data.demo ? 'demo' : 'live');
     el('generated-label').textContent = 'Updated ' + new Date(data.generatedAt).toLocaleTimeString();
+    updatePlanChrome();
     if (!location.hash) location.hash = '#/overview';
     else onHashChange();
+  }
+
+  // ---- Subscription / plan chrome -----------------------------------------
+  function updatePlanChrome() {
+    const p = MTK.plan.get();
+    const badge = el('plan-label');
+    if (badge) { badge.textContent = p.name; badge.className = 'plan-badge tier-' + p.id; }
+    const rpt = el('btn-report');
+    if (rpt) rpt.classList.toggle('hidden', !MTK.plan.can('export'));
+  }
+
+  // Simulated checkout. In production, replace the confirm() with your billing
+  // provider's flow (Stripe Checkout, Apple/Google IAP) and call MTK.plan.set
+  // from the success callback.
+  MTK.subscribe = function (tier) {
+    const p = MTK.plan.PLANS[tier];
+    if (!p) return;
+    if (tier === 'free' || MTK.state.data && MTK.state.data.demo) {
+      MTK.plan.set(tier);
+      toast(tier === MTK.plan.id() ? `You're on the ${p.name} plan` : `Switched to ${p.name}`);
+      return;
+    }
+    const ok = window.confirm(`Subscribe to MerakiScope ${p.name} for $${p.price}/mo per organization?\n\n(Demo: this simulates checkout — no payment is taken.)`);
+    if (ok) { MTK.plan.set(tier); toast(`Welcome to ${p.name}! 🎉`); }
+  };
+
+  MTK.onPlanChange = function () {
+    updatePlanChrome();
+    if (MTK.state.data) MTK.ui.render(MTK.state.route || 'overview');
+  };
+
+  function toast(msg) {
+    let t = el('toast');
+    if (!t) { t = document.createElement('div'); t.id = 'toast'; document.body.appendChild(t); }
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
   // ---- Connect flow --------------------------------------------------------
@@ -143,9 +181,12 @@
     el('load-live').onclick = loadLive;
     el('btn-disconnect').onclick = disconnect;
     el('btn-refresh').onclick = refresh;
+    el('btn-report').onclick = () => MTK.ui.printReport();
+    el('plan-label').onclick = () => MTK.go('pricing');
 
     document.querySelectorAll('.nav-tab').forEach((t) => t.onclick = () => MTK.go(t.dataset.route));
     window.addEventListener('hashchange', onHashChange);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') MTK.ui.closeModal(); });
 
     // Mobile nav toggle
     const menuBtn = el('menu-toggle');

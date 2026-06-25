@@ -24,6 +24,15 @@
   function pick(rand, arr) { return arr[Math.floor(rand() * arr.length)]; }
   function between(rand, lo, hi) { return lo + rand() * (hi - lo); }
   function round(n, d) { const f = Math.pow(10, d || 0); return Math.round(n * f) / f; }
+  // A gently wandering series around `base`, optionally rising toward the end.
+  function series(rand, base, jitter, n, trend) {
+    const out = []; let v = base;
+    for (let i = 0; i < n; i++) {
+      v += between(rand, -jitter, jitter) + (trend || 0);
+      out.push(round(Math.max(0, v), 1));
+    }
+    return out;
+  }
 
   const MANUFACTURERS = ['Apple', 'Dell', 'Samsung', 'HP', 'Lenovo', 'Intel', 'Google', 'Microsoft', 'Cisco', 'Sonos'];
   const OS = ['macOS', 'Windows 11', 'iOS 17', 'Android 14', 'Windows 10', 'iPadOS 17', 'ChromeOS'];
@@ -43,6 +52,9 @@
 
   function build() {
     const rand = rng(20240615);
+    // Separate stream for trend/sparkline data so adding charts never perturbs
+    // the primary demo (keeps the health score & findings stable).
+    const srand = rng(77003311);
 
     const org = {
       id: '549236',
@@ -92,6 +104,8 @@
         uplinkLossLatency.push({
           serial, networkId: net.id, uplink: 'wan1',
           avgLossPercent: round(wan1Loss, 2), avgLatencyMs: round(wan1Lat, 1),
+          latencySeries: series(srand, wan1Lat, ni === 1 ? 28 : 6, 24, ni === 1 ? 3 : 0),
+          lossSeries: series(srand, wan1Loss, ni === 1 ? 0.8 : 0.15, 24, ni === 1 ? 0.12 : 0),
         });
       }
 
@@ -207,10 +221,18 @@
       daysToExpiration: 38,
     };
 
+    // ---- Trends (for sparklines / history) ---------------------------------
+    const trends = {
+      healthHistory: series(srand, 42, 5, 14, -1.2).map((v) => Math.max(0, Math.min(100, Math.round(v)))),
+      usageHistoryBytes: series(srand, 40, 18, 24, 0).map((v) => Math.round(v * 1e9)),
+      clientsOnlineHistory: series(srand, 150, 22, 24, 0).map((v) => Math.round(v)),
+    };
+
     return {
       generatedAt: new Date().toISOString(),
       demo: true,
       org,
+      trends,
       networks,
       devices,
       deviceStatuses,

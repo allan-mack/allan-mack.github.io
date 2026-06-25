@@ -91,6 +91,48 @@ automatically.
 > For production use, lock the proxy down to your own origin and consider
 > keeping the API key server-side rather than passing it through the browser.
 
+## Plans & subscription model
+
+MerakiScope ships with a three-tier model so it can be offered as a freemium
+product. Tiers and the capabilities they unlock are defined in
+[`js/plans.js`](js/plans.js); every gate in the UI reads from there.
+
+| | **Free** — $0 | **Pro** — $29/org/mo | **Enterprise** — $99/org/mo |
+|---|---|---|---|
+| Health score & overview | ✅ | ✅ | ✅ |
+| Prioritized insights | Top 6 | Unlimited | Unlimited |
+| Clients | Up to 25 | Unlimited + deep-dive | Unlimited + deep-dive |
+| Application metrics (latency/loss) | Usage only | ✅ | ✅ |
+| Network & device detail | Summary | Full + uplink sparklines | Full + uplink sparklines |
+| 7-day trends & sparklines | — | ✅ | ✅ |
+| Printable health report | — | ✅ | ✅ |
+| Multi-org switching & rollup | — | — | ✅ |
+| Scheduled reports, audit log, SLA, white-label | — | — | ✅ |
+
+In the demo you can switch tiers instantly from the plan badge (top-right) or
+the **Plans** tab to feel the difference. The demo defaults to **Pro** so all
+depth is visible.
+
+**Connecting real billing:** the in-app "subscribe" is a simulated checkout.
+To go live, drop in Stripe Checkout (web) or Apple/Google in-app purchase
+(installed app) and call `MTK.plan.set(tier)` from the success callback — no
+other code changes are needed because entitlements are already centralized.
+
+## Designed to be understood
+
+Because the audience is technology managers, not network engineers:
+
+- **Every finding is plain-English** with *what it is → why it matters → what
+  to do*.
+- **Jargon is tappable.** Underlined terms (RSSI, latency, DHCP, channel
+  utilization, …) open a one-tap definition, and the **Help** tab has a full
+  glossary and getting-started guide.
+- **Click any client** for a deep-dive with device-specific advice.
+- **Trends & sparklines** show whether things are getting better or worse, not
+  just a single snapshot.
+- **One-click report** produces a printable / save-as-PDF health summary for
+  sharing with leadership.
+
 ## What it analyzes
 
 | Area | Signals used |
@@ -117,11 +159,12 @@ meraki/
 ├── css/app.css             Responsive dark dashboard theme
 ├── icons/                  App icons (SVG, incl. maskable)
 └── js/
-    ├── mock.js             Seeded demo-organization generator
+    ├── plans.js            Subscription tiers & feature entitlements
+    ├── mock.js             Seeded demo-organization generator (+ trends)
     ├── api.js              Live Meraki Dashboard API client
     ├── insights.js         Plain-English analysis/recommendation engine
-    ├── ui.js               Views + router
-    └── app.js              Bootstrap, state, connect flow, PWA registration
+    ├── ui.js               Views, router, glossary, modals, plan gating
+    └── app.js              Bootstrap, state, connect flow, subscribe, PWA
 ```
 
 `mock.js` and `api.js` produce the *same* normalized data model, so the

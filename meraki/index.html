@@ -91,6 +91,8 @@
       </div>
       <div class="topbar-actions">
         <span id="generated-label" class="muted small"></span>
+        <button id="plan-label" class="plan-badge tier-pro" title="Your plan — tap to compare">Pro</button>
+        <button id="btn-report" class="icon-btn hidden" title="Download report">⬇</button>
         <button id="btn-refresh" class="icon-btn" title="Refresh">⟳</button>
         <button id="btn-disconnect" class="icon-btn" title="Disconnect">⏻</button>
       </div>
@@ -102,11 +104,16 @@
       <button class="nav-tab" data-route="clients">👥 Clients</button>
       <button class="nav-tab" data-route="apps">📱 Applications</button>
       <button class="nav-tab" data-route="networks">🌐 Networks</button>
+      <button class="nav-tab" data-route="pricing">💳 Plans</button>
+      <button class="nav-tab" data-route="help">❓ Help</button>
     </nav>
 
     <main id="view"></main>
   </div>
 
+  <div id="modal-root" class="hidden"></div>
+
+  <script src="./js/plans.js"></script>
   <script src="./js/mock.js"></script>
   <script src="./js/api.js"></script>
   <script src="./js/insights.js"></script>
