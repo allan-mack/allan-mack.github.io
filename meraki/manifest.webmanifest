@@ -2,7 +2,7 @@
   "name": "MerakiScope — Meraki Troubleshooting",
   "short_name": "MerakiScope",
   "description": "An all-in-one troubleshooting companion for Cisco Meraki organizations, built for technology managers.",
-  "start_url": "./index.html",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

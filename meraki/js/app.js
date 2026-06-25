@@ -266,6 +266,11 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW registration failed', e));
     }
+
+    // Landing page hero links here with ?demo=1 — launch straight into the demo.
+    try {
+      if (/[?&]demo=1\b/.test(location.search)) loadDemo();
+    } catch (e) {}
   }
 
   document.addEventListener('DOMContentLoaded', init);

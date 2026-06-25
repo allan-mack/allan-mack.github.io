@@ -32,10 +32,19 @@ offline.
 > app-store friction. If a true native wrapper is ever needed later, this same
 > web app drops straight into Capacitor or a TWA.
 
+## Pages
+
+- **`index.html`** — the marketing landing page (hero, who-it's-for,
+  features, screenshots, pricing, FAQ). The front door for visitors.
+- **`app.html`** — the application itself (connect screen + dashboard). The
+  landing CTAs link here; `app.html?demo=1` opens straight into the demo, and
+  the installed PWA uses `app.html` as its start URL.
+
 ## Try it instantly (Demo mode)
 
-Open `index.html` and click **Launch demo organization**. No API key, no
-account. The demo is a realistic four-site company ("Northwind Trading Co.")
+Open `index.html`, click **Launch live demo** (or open `app.html?demo=1`
+directly). No API key, no account. The demo is a realistic four-site company
+("Northwind Trading Co.")
 with problems deliberately baked in — an offline appliance, a congested access
 point, a flaky uplink, Wi-Fi auth failures, a struggling Zoom — so you can see
 how the Insights engine reasons about good *and* bad conditions.
@@ -209,10 +218,14 @@ gets the headline in one glance, then can drill into the details.
 
 ```
 meraki/
-├── index.html              App shell (connect screen + dashboard)
-├── manifest.webmanifest    PWA manifest (installable on phones)
+├── index.html              Marketing landing page
+├── app.html                App shell (connect screen + dashboard)
+├── manifest.webmanifest    PWA manifest (start_url = app.html)
 ├── sw.js                   Service worker (offline shell)
-├── css/app.css             Responsive dark dashboard theme
+├── img/                    Landing-page screenshots
+├── css/
+│   ├── app.css             Responsive dark dashboard theme
+│   └── landing.css         Marketing landing styles
 ├── icons/                  App icons (SVG, incl. maskable)
 └── js/
     ├── plans.js            Subscription tiers & feature entitlements
