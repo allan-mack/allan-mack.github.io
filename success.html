@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thank You — Your Florida Insider Guide</title>
+    <meta name="robots" content="noindex" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous" />
+    <link href="styles.css" rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="header_container">
+            <div class="flex1">
+                <a href="/"
+                    class="d-flex w-50 align-items-center mb-0 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
+                    <img src="https://www.myflorida.com/img/SoF-seal.png" height="100px">
+                    <span class="fs-2"
+                        style="padding: 10px; margin: 10px; color: white; background-color: #004E71;">The State of
+                        Florida
+                </a>
+            </div>
+            <div class="flex2">
+                <nav>
+                    <ul class="nav nav-pills h-auto mb-0 mb-md-0 me-md-auto">
+                        <li class="nav-item"><a href="./index.html" class="nav-link">Home</a></li>
+                        <li class="nav-item"><a href="./store.html" class="nav-link">Guide 🌴</a></li>
+                        <li class="nav-item"><a href="./contact_us.html" class="nav-link">Contact Us</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <section class="store-section" style="text-align:center;">
+        <div class="store-buybox" style="max-width:640px;">
+            <div style="font-size:3.5rem;">🌴🎉</div>
+            <h1 class="store-h2" style="margin-top:8px;">Thank you — you're all set!</h1>
+            <p style="font-size:1.1rem;">Your payment went through and your copy of <strong>The Florida Insider
+                    Guide</strong> is ready. A copy of this link has also been emailed to you.</p>
+
+            <!-- Replace href with the real download URL of your PDF
+                 (e.g. a GitHub release asset, Google Drive share link, or Stripe-hosted file). -->
+            <a id="download-btn" class="store-cta" href="#"
+                style="display:inline-block; text-decoration:none; margin:14px 0;">⬇️ Download your guide (PDF)</a>
+
+            <p class="store-guarantee">Trouble downloading? Email us from the <a href="./contact_us.html">Contact</a>
+                page and we'll sort it out fast.</p>
+            <p style="margin-top:20px;"><a href="./index.html">← Back to home</a></p>
+        </div>
+    </section>
+
+    <div class="container">
+        <footer class="d-flex flex-wrap justify-content-between align-items-center py-3 my-4 border-top">
+            <p class="col-md-4 mb-0 text-body-secondary">© Allan Mack, 2023</p>
+            <a href="/"
+                class="col-md-4 d-flex align-items-center justify-content-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none">
+                <svg class="bi me-2" width="40" height="32">
+                    <use xlink:href="#bootstrap"></use>
+                </svg>
+            </a>
+            <ul class="nav col-md-4 justify-content-end">
+                <li class="nav-item"><a href="./index.html" class="nav-link px-2 text-body-secondary">Home</a></li>
+                <li class="nav-item"><a href="./store.html" class="nav-link px-2 text-body-secondary">Guide</a></li>
+                <li class="nav-item"><a href="./contact_us.html" class="nav-link px-2 text-body-secondary">Contact
+                        Us</a></li>
+            </ul>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
+        crossorigin="anonymous"></script>
+    <script>
+        // Paste the public download URL of your guide PDF here.
+        const GUIDE_DOWNLOAD_URL = "";
+        const dl = document.getElementById("download-btn");
+        if (GUIDE_DOWNLOAD_URL) {
+            dl.href = GUIDE_DOWNLOAD_URL;
+            dl.setAttribute("download", "");
+        } else {
+            dl.addEventListener("click", function (e) {
+                e.preventDefault();
+                alert("Add your guide's download URL to GUIDE_DOWNLOAD_URL in success.html. See MONETIZATION.md.");
+            });
+        }
+    </script>
+</body>
+
+</html>
