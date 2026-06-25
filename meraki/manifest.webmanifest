@@ -1,0 +1,26 @@
+{
+  "name": "MerakiScope — Meraki Troubleshooting",
+  "short_name": "MerakiScope",
+  "description": "An all-in-one troubleshooting companion for Cisco Meraki organizations, built for technology managers.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a1726",
+  "theme_color": "#0b1f33",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "utilities"]
+}

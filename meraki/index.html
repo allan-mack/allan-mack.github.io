@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1f33" />
+  <meta name="description" content="MerakiScope — an all-in-one troubleshooting companion for Cisco Meraki organizations, built for technology managers." />
+  <title>MerakiScope — Meraki Troubleshooting</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg" />
+  <link rel="apple-touch-icon" href="./icons/icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MerakiScope" />
+  <link rel="stylesheet" href="./css/app.css" />
+</head>
+
+<body>
+  <!-- ============ CONNECT SCREEN ============ -->
+  <main id="connect-screen">
+    <div class="connect-wrap">
+      <div class="brand">
+        <img src="./icons/icon.svg" alt="" width="56" height="56" />
+        <div>
+          <h1>MerakiScope</h1>
+          <p class="tagline">Troubleshoot your Cisco&nbsp;Meraki organization — in plain English.</p>
+        </div>
+      </div>
+
+      <div class="card connect-card">
+        <h2>Start exploring</h2>
+        <p class="muted">New here? Load the guided demo organization — no account or API key needed. It is a full, realistic network with a few problems baked in so you can see how the tool thinks.</p>
+        <button id="btn-demo" class="btn primary big">▶ Launch demo organization</button>
+
+        <details class="live-details">
+          <summary>Connect to your real Meraki organization</summary>
+          <p class="muted small">
+            Create a read-only API key in the Meraki dashboard
+            (<em>My profile → API access</em>). Your key stays in this browser and is never stored or sent anywhere except to Meraki.
+          </p>
+
+          <label>Meraki API key
+            <input id="api-key" type="password" autocomplete="off" placeholder="Paste your API key" />
+          </label>
+
+          <div class="row-2">
+            <label>API base URL <span class="muted small">(optional)</span>
+              <input id="base-url" type="text" placeholder="https://api.meraki.com/api/v1" />
+            </label>
+            <label>CORS proxy URL <span class="muted small">(required in a browser)</span>
+              <input id="proxy-url" type="text" placeholder="https://your-proxy.example/?url=" />
+            </label>
+          </div>
+
+          <div class="callout">
+            <strong>Why a proxy?</strong> Web browsers block direct calls to the Meraki API for security (CORS). Run a tiny relay
+            (e.g. a Cloudflare Worker) that forwards requests to <code>api.meraki.com</code> and adds the
+            <code>Access-Control-Allow-Origin</code> header, then paste its URL above. The README in this folder has a copy-paste example.
+          </div>
+
+          <button id="fetch-orgs" class="btn">Connect &amp; list organizations</button>
+
+          <div id="org-picker" class="hidden">
+            <label>Organization
+              <select id="org-select"></select>
+            </label>
+          </div>
+          <button id="load-live" class="btn primary hidden">Load this organization</button>
+        </details>
+
+        <div id="connect-error" class="error hidden"></div>
+        <div id="connect-spinner" class="spinner hidden"><span class="loader"></span> <span id="spinner-label">Working…</span></div>
+      </div>
+
+      <p class="footnote">Installable on iPhone, iPad, and Android: open this page in your browser and choose <em>Add to Home Screen</em>. Works offline once loaded.</p>
+    </div>
+  </main>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="app-shell" class="hidden">
+    <header class="topbar">
+      <button id="menu-toggle" class="icon-btn" aria-label="Menu">☰</button>
+      <div class="topbar-brand">
+        <img src="./icons/icon.svg" alt="" width="28" height="28" />
+        <strong>MerakiScope</strong>
+      </div>
+      <div class="topbar-org">
+        <span id="org-label">—</span>
+        <span id="mode-label" class="mode-badge demo">Demo</span>
+      </div>
+      <div class="topbar-actions">
+        <span id="generated-label" class="muted small"></span>
+        <button id="btn-refresh" class="icon-btn" title="Refresh">⟳</button>
+        <button id="btn-disconnect" class="icon-btn" title="Disconnect">⏻</button>
+      </div>
+    </header>
+
+    <nav id="main-nav">
+      <button class="nav-tab active" data-route="overview">📊 Overview</button>
+      <button class="nav-tab" data-route="insights">💡 Insights</button>
+      <button class="nav-tab" data-route="clients">👥 Clients</button>
+      <button class="nav-tab" data-route="apps">📱 Applications</button>
+      <button class="nav-tab" data-route="networks">🌐 Networks</button>
+    </nav>
+
+    <main id="view"></main>
+  </div>
+
+  <script src="./js/mock.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/insights.js"></script>
+  <script src="./js/ui.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+
+</html>
