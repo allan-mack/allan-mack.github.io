@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InvoiceFox — Free Invoice Generator (instant PDF, no signup)</title>
+    <meta name="description"
+        content="Create and download professional PDF invoices in seconds. Free, runs in your browser, no signup. Go Pro to remove branding and unlock templates." />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link href="app.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- ===================== TOP BAR ===================== -->
+    <header class="topbar">
+        <div class="brand">🦊 <span>InvoiceFox</span></div>
+        <nav class="topbar-actions">
+            <span id="pro-badge" class="pro-badge hidden">PRO</span>
+            <button id="open-pro" class="btn btn-ghost">Go Pro</button>
+            <button id="print-btn" class="btn btn-ghost">Print</button>
+            <button id="download-btn" class="btn btn-primary">Download PDF</button>
+        </nav>
+    </header>
+
+    <main class="layout">
+        <!-- ===================== EDITOR ===================== -->
+        <section class="editor" aria-label="Invoice editor">
+            <div class="panel">
+                <h2 class="panel-h">Your business</h2>
+                <div class="logo-row">
+                    <label class="logo-drop" id="logo-drop">
+                        <img id="logo-preview" alt="" class="hidden" />
+                        <span id="logo-placeholder">＋ Logo</span>
+                        <input type="file" id="logo-input" accept="image/*" hidden>
+                    </label>
+                    <div class="grow">
+                        <input class="inp" id="from-name" placeholder="Your business name" autocomplete="off">
+                        <input class="inp" id="from-email" placeholder="you@business.com" autocomplete="off">
+                    </div>
+                </div>
+                <textarea class="inp" id="from-address" rows="2" placeholder="Street, City, State ZIP"></textarea>
+                <button id="save-profile" class="btn btn-ghost btn-sm">💾 Save business profile</button>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-h">Bill to</h2>
+                <input class="inp" id="to-name" placeholder="Client / company name" autocomplete="off">
+                <input class="inp" id="to-email" placeholder="client@email.com" autocomplete="off">
+                <textarea class="inp" id="to-address" rows="2" placeholder="Client address"></textarea>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-h">Invoice details</h2>
+                <div class="grid-2">
+                    <label class="field"><span>Invoice #</span><input class="inp" id="meta-number"
+                            value="INV-0001"></label>
+                    <label class="field"><span>Currency</span>
+                        <select class="inp" id="meta-currency">
+                            <option value="$">$ USD</option>
+                            <option value="€">€ EUR</option>
+                            <option value="£">£ GBP</option>
+                            <option value="C$">C$ CAD</option>
+                            <option value="A$">A$ AUD</option>
+                            <option value="₹">₹ INR</option>
+                            <option value="¥">¥ JPY</option>
+                        </select>
+                    </label>
+                    <label class="field"><span>Date</span><input class="inp" type="date" id="meta-date"></label>
+                    <label class="field"><span>Due date</span><input class="inp" type="date" id="meta-due"></label>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-h">Line items</h2>
+                <div id="items"></div>
+                <button id="add-item" class="btn btn-ghost btn-sm">＋ Add line item</button>
+                <div class="grid-2 mt">
+                    <label class="field"><span>Tax %</span><input class="inp" type="number" id="meta-tax" value="0"
+                            min="0" step="0.01"></label>
+                    <label class="field"><span>Discount %</span><input class="inp" type="number" id="meta-discount"
+                            value="0" min="0" step="0.01"></label>
+                </div>
+                <label class="field mt"><span>Notes / payment terms</span>
+                    <textarea class="inp" id="meta-notes" rows="2"
+                        placeholder="Thanks for your business! Payment due within 14 days."></textarea>
+                </label>
+            </div>
+
+            <div class="panel pro-panel">
+                <h2 class="panel-h">Design <span class="pro-tag">PRO</span></h2>
+                <div class="grid-2">
+                    <label class="field"><span>Template</span>
+                        <select class="inp" id="opt-template" data-pro>
+                            <option value="modern">Modern</option>
+                            <option value="classic">Classic</option>
+                            <option value="minimal">Minimal</option>
+                        </select>
+                    </label>
+                    <label class="field"><span>Accent color</span><input class="inp color" type="color"
+                            id="opt-accent" value="#4f46e5" data-pro></label>
+                </div>
+                <p class="pro-hint" id="pro-hint">🔒 Templates, colors & no-branding unlock with Pro.</p>
+            </div>
+        </section>
+
+        <!-- ===================== PREVIEW ===================== -->
+        <section class="preview-wrap" aria-label="Invoice preview">
+            <div id="paper" class="paper template-modern">
+                <div class="iv-head">
+                    <div class="iv-from">
+                        <img id="pv-logo" class="iv-logo hidden" alt="logo">
+                        <div class="iv-from-name" id="pv-from-name">Your business name</div>
+                        <div class="iv-muted" id="pv-from-email"></div>
+                        <div class="iv-muted" id="pv-from-address"></div>
+                    </div>
+                    <div class="iv-title">
+                        <h1>INVOICE</h1>
+                        <div class="iv-muted" id="pv-number">INV-0001</div>
+                    </div>
+                </div>
+
+                <div class="iv-meta">
+                    <div>
+                        <div class="iv-label">Bill to</div>
+                        <div class="iv-strong" id="pv-to-name">Client name</div>
+                        <div class="iv-muted" id="pv-to-email"></div>
+                        <div class="iv-muted" id="pv-to-address"></div>
+                    </div>
+                    <div class="iv-dates">
+                        <div><span class="iv-label">Date</span> <span id="pv-date"></span></div>
+                        <div><span class="iv-label">Due</span> <span id="pv-due"></span></div>
+                    </div>
+                </div>
+
+                <table class="iv-table">
+                    <thead>
+                        <tr>
+                            <th class="ta-l">Description</th>
+                            <th class="ta-r">Qty</th>
+                            <th class="ta-r">Rate</th>
+                            <th class="ta-r">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pv-items"></tbody>
+                </table>
+
+                <div class="iv-totals">
+                    <div class="iv-trow"><span>Subtotal</span><span id="pv-subtotal">$0.00</span></div>
+                    <div class="iv-trow" id="pv-discount-row"><span>Discount</span><span id="pv-discount">-$0.00</span>
+                    </div>
+                    <div class="iv-trow" id="pv-tax-row"><span>Tax</span><span id="pv-tax">$0.00</span></div>
+                    <div class="iv-trow iv-grand"><span>Total</span><span id="pv-total">$0.00</span></div>
+                </div>
+
+                <div class="iv-notes" id="pv-notes"></div>
+                <div class="iv-watermark" id="pv-watermark">Created free with InvoiceFox</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ===================== PRO MODAL ===================== -->
+    <div id="pro-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pro-title">
+        <div class="modal-card">
+            <button class="modal-x" id="pro-close" aria-label="Close">×</button>
+            <h2 id="pro-title">Unlock InvoiceFox Pro</h2>
+            <p class="modal-price"><span>$12</span> one-time · yours forever</p>
+            <ul class="modal-list">
+                <li>Remove the “Created with InvoiceFox” line</li>
+                <li>3 premium templates + custom accent color</li>
+                <li>Saved business profile &amp; logo</li>
+                <li>Unlimited invoices, no signup, no subscription</li>
+            </ul>
+            <button id="buy-pro" class="btn btn-primary btn-block">Buy Pro → Instant unlock</button>
+            <div class="modal-divider"><span>already bought?</span></div>
+            <div class="unlock-row">
+                <input class="inp" id="license-input" placeholder="Enter unlock code">
+                <button id="apply-license" class="btn btn-ghost">Unlock</button>
+            </div>
+            <p id="license-msg" class="license-msg" role="status"></p>
+            <p class="modal-fine">Secure checkout via Stripe. 30-day money-back guarantee.</p>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
+        integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
